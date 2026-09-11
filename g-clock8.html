@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>eTime is NOW</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
+body {
+    background: radial-gradient(circle at center, #1a1c23 0%, #605A82 100%);
+    color: #f3f4f6;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+    font-size: 1.9rem;
+    font-weight: 600;
+    letter-spacing: 3px;
+    margin-bottom: 6px;
+    color: #e5e7eb;
+}
+
+.subtitle {
+    text-align: center;
+    color: #9ca3af;
+    font-size: 2.95rem;
+    margin-bottom: 28px;
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.5;
+}
+
+#clocks-bank {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 28px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.clock-wrapper {
+    background: rgba(30, 41, 59, 0.45);
+    border: 2px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.clock-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #38bdf8;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.clock-canvas {
+    width: 100%;
+    aspect-ratio: 1/1;
+    max-width: 340px;
+    border-radius: 2px;
+    overflow: hidden;
+}
+</style>
+</head>
+<body>
+
+<h1>One World - One Time</h1>
+<p class="subtitle" id="ShowTime">
+    Z:00
+</p>
+
+<div id="clocks-bank"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.185.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+/* ways to output to console: 
+console.log('myVariable:', myVariable);          // labeled
+console.table(myVariable);                       // nice table for arrays/objects
+console.dir(myVariable);                         // expandable object view
+console.log({ myVariable });     
+*/
+const COLORS = {
+    // Letters
+    letterCurrent:       '#FFFFFF',
+    letterDay:           '#DBD824',
+    letterNight:         '#635F63',
+    backDay:           '#232AAD',
+    backNight:         '#212633',
+    letterCurrentBg:     'rgba(255, 230, 150, 0.15)',
+
+	torus_day: '#054CFF',
+	torus_nit: '#000000',
+	torus_day_line: '#FFFFFf',
+	torus_nit_line: '#000000',
+
+	hourHandLeft: '#F0E77E',
+	hourHandRight: '#807224',
+  // Highlight ring
+    highlight:           0xffe6a0,
+
+    // Tube / structure
+    tube:                0x757378,
+
+    // Hands
+    hourHand:            0xFFEA8F,
+    minuteHand:          0xFCF260,
+    secondHand:          0xef4444,
+    secondHandEmissive:  0x991b1b,
+
+    // Center pin
+    pin:                 0xD4D274,
+
+    // Lights
+    ambient:             0xffffff,
+    keyLight:            0xffffff,
+    rimLight:            0x38bdf8
+};
+// ============================================================
+
+//const alphabet =   "XWVUTSRQPONMLKJIHGFEDCBA";
+const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWX";
+const  main_offset = 6;  // to get the cross over correct
+ 
+const demoZones = [
+    { offset: -7, label: "Los Angeles (UTC-8)" },
+    { offset: -6, label: "Denver (UTC-7)" },
+    { offset: -5, label: "Chicago (UTC-6)" },
+    { offset: -4, label: "New York (UTC-5)" },
+    { offset:  0, label: "London (UTC+0)" }
+];
+
+class ETimeClock {
+    constructor(parent, offsetHours, labelText) {
+        this.offsetHours = offsetHours;
+        this.letterMeshes = [];
+        this.highlight = null;
+		this.system_time_zone = -(new Date().getTimezoneOffset() / 60);
+		this.theLetterHour = "Y"; // ecause it cant' 
+		this.gradientMaterial = null;
+		this.nightCircle = null;
+		this.dayCircle = null;
+		this.n_faceMesh= null;
+		this.IsDayNow = false;
+		this.dayNight = 'undefined';
+        this.wrapper = document.createElement('div');
+        this.wrapper.className = 'clock-wrapper';
+
+        this.label = document.createElement('div');
+        this.label.className = 'clock-label';
+        this.label.textContent = labelText;
+        this.wrapper.appendChild(this.label);
+
+        this.container = document.createElement('div');
+        this.container.className = 'clock-canvas';
+        this.wrapper.appendChild(this.container);
+        parent.appendChild(this.wrapper);
+
+        // Three.js
+        this.scene = new THREE.Scene();
+
+        this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+        this.camera.position.z = 14;
+
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.shadowMap.enabled = true;
+        this.container.appendChild(this.renderer.domElement);
+		
+ 
+        // Lights
+        this.scene.add(new THREE.AmbientLight(COLORS.ambient, 0.3));
+        const key = new THREE.DirectionalLight(COLORS.keyLight, 0.85);
+        key.position.set(5, 8, 10);
+        this.scene.add(key);
+        const rim = new THREE.DirectionalLight(COLORS.rimLight, 0.45);
+        rim.position.set(-5, -5, -5);
+        this.scene.add(rim);
+
+        this.clockGroup = new THREE.Group();
+        this.scene.add(this.clockGroup);
+
+        this.buildClockMesh();
+        this.onResize();
+        window.addEventListener('resize', () => this.onResize());
+    }
+
+    onResize() {
+        const w = this.container.clientWidth;
+        const h = this.container.clientHeight;
+        this.camera.aspect = w / h;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(w, h);
+    }
+
+    clearClock() {
+        while (this.clockGroup.children.length > 0) {
+            const child = this.clockGroup.children[0];
+            this.clockGroup.remove(child);
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) {
+                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                mats.forEach(m => { if (m.map) m.map.dispose(); m.dispose(); });
+            }
+        }
+        this.letterMeshes = [];
+        this.hourHandGroup = this.minuteHandGroup = this.secondHandGroup = null;
+        this.highlight = null;
+    }
+
+    make_letter(nwhich, nDay) {  // 0, 1,2,3,4,5,6,7,8,9,10,11,12+0,12+1,12+2,12+3,12+4,12+5,12+6,12+7,12+8....,
+        const size = 128;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+		const npos = nwhich + (nDay * 12) ;
+		
+        const ctx = canvas.getContext('2d');
+		ctx.fillStyle = 'rgba(255, 0, 0, 0.15)';
+		ctx.clearRect(0, 0, size, size);
+
+        const tz = ((npos- this.offsetHours + this.system_time_zone ) % 24 + 24) % 24;
+        const letter = alphabet[tz];
+
+		if (nDay === 1) {
+            ctx.fillStyle = COLORS.letterDay;
+        } else {
+            ctx.fillStyle = COLORS.letterNight;
+        }
+
+        ctx.font = `bold ${size * 0.68}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(letter, size/2, size/2 + size*0.03);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.rotation = Math.PI / 2;
+        texture.center.set(0.5, 0.5);
+        texture.needsUpdate = true;
+        texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+
+        const tz0 = (this.offsetHours + npos);
+   		const angle = ((tz0 + main_offset) ) * Math.PI * 2; // this plus 6 puts the mobius strip at the bottom
+     return {
+            material: new THREE.MeshBasicMaterial({
+                map: texture,
+                side: THREE.FrontSide,
+ 				transparent: true,
+				opacity: 1,
+               depthWrite: false
+            }),
+            nPosition: tz,
+			alpha_letter: letter,
+			dot_angle: angle
+        };
+    }
+	
+	buildHourHandMat() {
+		// Create an off-screen canvas
+		const canvas = document.createElement('canvas');
+		const szX = 30;
+		const szY = 128;
+		//const linesz = 2;
+		canvas.width = szX;
+		canvas.height = szY;
+		const ctx = canvas.getContext('2d');
+
+		ctx.clearRect(0, 0, szX, szY);
+
+		ctx.fillStyle = COLORS.hourHandLeft;
+		ctx.beginPath();
+		ctx.moveTo(szX/2,0);   
+		ctx.lineTo(0, szY/5);   // left corner
+		ctx.lineTo(szX/2, szY);   // tip
+		ctx.closePath();
+		ctx.fill();		
+
+		ctx.fillStyle = COLORS.hourHandRight;
+		ctx.beginPath();
+		ctx.moveTo(szX/2,0);   
+		ctx.lineTo(szX, szY/5);   // left corner
+		ctx.lineTo(szX/2, szY);  //  tip
+		ctx.closePath();
+		ctx.fill();		
+
+		const texture = new THREE.CanvasTexture(canvas);
+		const mat = new THREE.MeshStandardMaterial({
+			map: texture,
+			transparent: true,     // Required to enable alpha channel blending
+			alphaTest: 0.5,        // Discards fully transparent pixels from the depth buffer
+			roughness: 0.5,
+			metalness: 0.1
+		});
+		
+		return mat;
+	}
+	
+	buildHourArrow() {
+	
+		const arrowShape = new THREE.Shape();
+		const a = 0.3, b = 0.2, c = 0.1;
+		arrowShape.moveTo(0, 3);       // The sharp tip (top center)
+		arrowShape.lineTo(-a, -a); // Bottom-left outer wing
+		arrowShape.lineTo(-b, -c); // Bottom-left inner notch (makes it look like a classic arrowhead)
+		arrowShape.lineTo(b, -c);  // Bottom-right inner notch
+		arrowShape.lineTo(a, -a);  // Bottom-right outer wing
+		arrowShape.closePath();        // Automatically connects back to (0, 1)
+
+		// 2. Extrude the 2D path into a 3D volume
+		const extrudeSettings = {
+			depth: 0.15,          // How thick the 3D object is
+			bevelEnabled: true,   // Adds a small slant to the edges to catch light reflections
+			bevelThickness: 0.03, // How deep the bevel goes into the front face
+			bevelSize: 0.02,      // How far the bevel extends outwards
+			bevelSegments: 3      // Smoothness of the edge roundness
+		};
+
+		const geometry = new THREE.ExtrudeGeometry(arrowShape, extrudeSettings);
+		geometry.center();
+
+		const material = new THREE.MeshStandardMaterial({ 
+			color: COLORS.hourHandLeft,
+			roughness: 0.4,
+			metalness: 0.1
+		});
+
+		const arrowMesh = new THREE.Mesh(geometry, material);
+		arrowMesh.castShadow = true;
+		arrowMesh.receiveShadow = true;
+		
+		return arrowMesh;
+		//this.clockGroup.add(arrowMesh);
+	}	
+
+	buildNightCircle() {
+		const sz = 512;
+		const canvas = document.createElement('canvas');
+		canvas.width = sz;
+		canvas.height= sz;
+		const ctx = canvas.getContext('2d');
+
+		const gradient = ctx.createLinearGradient(0, 0, 0,  sz);
+		gradient.addColorStop(0.0 , 'black');
+		gradient.addColorStop(0.88 , 'black');
+		gradient.addColorStop(0.91, 'violet');
+		gradient.addColorStop(0.98, 'yellow');
+
+
+		ctx.fillStyle = gradient;
+		ctx.fillRect(0, 0, sz, sz);
+		
+		const starCount = 80;
+		ctx.fillStyle = '#ffffff'; // White stars
+		for (let i = 0; i < starCount; i++) {
+			const x = 1 + Math.random() * sz + 1; // stay off edges
+			const y = 1 + Math.random() * sz + 1; 
+			const radius = 0.35 + Math.random() * 0.5; 
+
+			ctx.beginPath();
+			ctx.arc(x, y, radius, 0, Math.PI * 2);
+			ctx.fill();
+		}
+		
+		// moon
+		ctx.beginPath();
+		const x = sz * 2 / 3;
+		const y = sz * 1 / 3;
+		const s = 30;
+		ctx.arc(x, y, s, -Math.PI / 2, Math.PI / 2, false);
+		ctx.arc(x+s*0.4, y, s, Math.PI / 2, -Math.PI / 2, true);
+		ctx.closePath();		
+		ctx.fill();
+		
+		const texture = new THREE.CanvasTexture(canvas);
+		texture.center.set(0.5, 0.5);          
+		texture.rotation = Math.PI / 2;   
+		
+		const material = new THREE.MeshStandardMaterial({
+			map: texture,
+			roughness: 0.3, // Lower values make it shinier
+			metalness: 0.1,
+			
+		});
+		return material;
+	}
+	
+	buildDayCircle() {
+		const sz = 512;
+		const canvas = document.createElement('canvas');
+		canvas.width = sz;
+		canvas.height= sz;
+		const ctx = canvas.getContext('2d');
+
+		const gradient = ctx.createLinearGradient(0, 0, 0,  sz);
+		gradient.addColorStop(0.0 , 'blue');
+		gradient.addColorStop(0.88 , 'blue');
+		gradient.addColorStop(0.92, 'yellow');
+
+		ctx.fillStyle = gradient;
+		ctx.fillRect(0, 0, sz, sz);
+		
+
+		const groupX = sz * 2 / 3;
+		const groupY = sz / 3;
+			
+		for (let g = 0; g < 3; g++) {
+			const radius = 15 + g * 7;
+			ctx.fillStyle = `rgba(255, 255, 0, ${1 - g * 0.30 })`;
+
+			ctx.beginPath();
+			ctx.arc(groupX, groupY, radius, 0, Math.PI * 2);
+			ctx.fill();
+			
+		}
+
+		const texture = new THREE.CanvasTexture(canvas);
+		texture.center.set(0.5, 0.5);         
+		texture.rotation = Math.PI / 2;     
+		const material = new THREE.MeshStandardMaterial({
+			map: texture,
+			roughness: 0.3, 
+			metalness: 0.1,
+			
+		});
+		return material;
+	}
+
+	
+	buildTubeMat3() {
+		// 1. Create a 2D canvas gradient
+		const w = 256;
+		const h = w*20;
+		const canvas = document.createElement('canvas');
+		canvas.width = w;
+		canvas.height =h;
+		const ctx = canvas.getContext('2d');
+
+		const gradient = ctx.createLinearGradient(0, 0, 0, h);
+		gradient.addColorStop(0.0 , 'blue');  // need to anchor that blue on both ends - otherwise overlap or underlap
+		gradient.addColorStop(0.1 , 'blue');
+		gradient.addColorStop(0.48, 'blue');
+		gradient.addColorStop(0.515, 'yellow');
+		gradient.addColorStop(0.52, 'green');
+		gradient.addColorStop(0.53, 'black');
+		gradient.addColorStop(0.91, 'black');
+		gradient.addColorStop(0.93, 'violet');
+		gradient.addColorStop(0.95, 'blue');
+		gradient.addColorStop(0.96, 'blue');
+
+
+		ctx.fillStyle = gradient;
+		ctx.fillRect(0, 0, w, h);
+		
+		const starCount = 80;
+		ctx.fillStyle = '#ffffff'; // White stars
+	    for (let i = 0; i < starCount; i++) {
+			const x = Math.random() * w ;
+			const y = ( h/2 +Math.random() * (h /2 -120)); // the last to get out of sunset
+			const radius =1.35 + Math.random() * 0.5; 
+
+			ctx.beginPath();
+			ctx.arc(x, y, radius, 0, Math.PI * 2);
+			ctx.fill();
+		}
+		
+	   // 2. Draw Clouds ONLY in the Blue Zone 
+		const cloudEndZone = canvas.width; 
+		const totalCloudGroups = 6; // Number of distinct cloud puffs
+
+		for (let g = 0; g < totalCloudGroups; g++) {
+			// Find a random anchor point within the blue section
+			const groupX = w/2 + Math.random() * w/2-50;
+			const groupY = 10 + Math.random() * (h/2 - 20); // Keep away from the absolute edges
+			
+			// Create an organic cloud shape by clustering 5-8 overlapping circles together
+			const circlesInPuff = 5 + Math.floor(Math.random() * 4);
+			
+			for (let c = 0; c < circlesInPuff; c++) {
+				// Slightly scatter each circle around the main anchor point
+				const offsetX = (Math.random() - 0.5) * 10;
+				const offsetY = (Math.random() - 0.5) * 10;
+				const radius = 5 + Math.random() * 35; // Varied puff sizes
+
+				// Use low opacity white so overlapping sections build up depth and look wispy
+				ctx.fillStyle = `rgba(255, 255, 255, ${0.1 + Math.random() * 0.15})`;
+
+				ctx.beginPath();
+				ctx.arc(groupX + offsetX, groupY + offsetY, radius, 0, Math.PI * 2);
+				ctx.fill();
+			}
+		}
+
+		const texture = new THREE.CanvasTexture(canvas);
+
+		texture.wrapS = THREE.RepeatWrapping;
+		texture.wrapT = THREE.RepeatWrapping;
+		texture.center.set(0.5, 0.5);          // Sets the pivot point to the absolute center
+		texture.rotation = Math.PI / 2;     // this is my doing - x is y for what ai says
+		texture.offset.x = 0.5; 
+
+		const material = new THREE.MeshStandardMaterial({
+			map: texture,
+			roughness: 0.3, // Lower values make it shinier
+			metalness: 0.1,
+			
+		});
+		return material;
+	}
+			
+	
+	buildTube() {
+       const points = [];
+        const radius = 4.6, radius2 =3.6, segments = 12; 
+        let total_segments = 0;
+       let sx, sy, s2x, s2y;
+        for (let i = 0; i < segments; i++) {
+            const a = (i / segments) * Math.PI * 2;
+            const x = Math.cos(a) * radius, y = Math.sin(a) * radius;
+            points.push(new THREE.Vector3(x, y, 0));
+			total_segments++;
+            if (i === 0) { sx = x; sy = y; }
+            if (i === 1) { s2x = x; s2y = y; }
+        }
+        for (let i = 0; i < segments; i++) {
+            const a = (i / segments) * Math.PI * 2;
+            points.push(new THREE.Vector3(Math.cos(a)*radius2, Math.sin(a)*radius2, 0));
+			total_segments++;
+        }
+		points.push(new THREE.Vector3(sx, sy, 0), new THREE.Vector3(s2x, s2y, 0));
+		total_segments++;
+
+        const curve = new THREE.CatmullRomCurve3(points);
+		
+		this.gradientMaterial = this.buildTubeMat3();
+		
+		const tube = new THREE.Mesh(
+			new THREE.TubeGeometry(curve, 256, 0.4, 12, false),this.gradientMaterial
+		);
+		tube.rotation.z = Math.PI * 5.67;
+		tube.position.z = -0.5;
+		
+		this.clockGroup.add(tube);
+	}		
+		
+    buildClockMesh() {
+        this.clearClock();
+
+        const day_dist = 4.45;
+        const night_dist = 3.45;
+        const dot_size = 0.51;
+
+        this.buildTube();
+ // Letters
+        for (let i = 0; i < 12; i++) {
+            //const angle = ((i + 6 ) / 12) * Math.PI * 2; // this plus 6 puts london about stright up
+            const tickGeo = new THREE.CylinderGeometry(dot_size, dot_size, 0.18, 48);
+
+            for (let j = 0; j < 2; j++) {
+                const { material, nPosition, alpha_letter, dot_angle } = this.make_letter(i, j);
+                const mesh = new THREE.Mesh(tickGeo, material);
+                const dist = j === 1 ? day_dist : night_dist;
+				const angle = ((i + main_offset ) / 12) * Math.PI * 2; // this plus 6 puts london about stright up
+                mesh.position.set(Math.sin(angle) * dist, Math.cos(angle) * dist, 0);
+                mesh.rotation.x = Math.PI / 2;
+                this.clockGroup.add(mesh);
+
+                this.letterMeshes.push({
+                    mesh,
+                    nPosition,
+                    baseScale: 1,
+                    dist,
+                    angle,
+					alpha_letter
+                });
+
+			}
+        }
+
+        // Highlight ring
+        const ringGeo = new THREE.TorusGeometry(0.62, 0.05, 12, 48);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: COLORS.highlight,
+            transparent: true,
+            opacity: 0.85
+        });
+        this.highlight = new THREE.Mesh(ringGeo, ringMat);
+        this.highlight.visible = false;
+        this.clockGroup.add(this.highlight);
+
+        // Hands
+        const hourMat = new THREE.MeshStandardMaterial({ color: COLORS.hourHand, metalness: 0.2, roughness: 0.4 });
+        const minMat  = new THREE.MeshStandardMaterial({ color: COLORS.minuteHand, metalness: 0.2, roughness: 0.4 });
+        const secMat  = new THREE.MeshStandardMaterial({
+            color: COLORS.secondHand,
+            metalness: 0.1,
+            roughness: 0.5,
+            emissive: COLORS.secondHandEmissive
+        });
+	   const n_faceMat = new THREE.MeshStandardMaterial({
+			color: 'yellow',
+			metalness: 0.3,
+			roughness: 0.6
+		});
+
+		this.justAClockCircle = new THREE.MeshStandardMaterial({
+			color: 'white',
+ 		});
+		
+        this.hourHandGroup = new THREE.Group();
+        this.hourHandGroup.position.z = 0.05;
+        //const hVis = new THREE.Mesh(new THREE.BoxGeometry(0.60, 3.2, 0.06), this.buildHourHandMat());
+        //const hVis = new THREE.Mesh(new THREE.BoxGeometry(0.20, 3.2, 0.06), hourMat);
+		const hVis = this.buildHourArrow();
+        hVis.position.y = 0.9;
+        this.hourHandGroup.add(hVis);
+        this.clockGroup.add(this.hourHandGroup);
+
+        this.minuteHandGroup = new THREE.Group();
+        this.minuteHandGroup.position.z = 0.18;
+        const mVis = new THREE.Mesh(new THREE.BoxGeometry(0.12, 3.3, 0.05), minMat);
+        mVis.position.y = 1.3;
+        this.minuteHandGroup.add(mVis);
+        this.clockGroup.add(this.minuteHandGroup);
+
+        this.secondHandGroup = new THREE.Group();
+        this.secondHandGroup.position.z = 0.26;
+        const sVis = new THREE.Mesh(new THREE.BoxGeometry(0.05, 3.6, 0.03), secMat);
+        sVis.position.y = 1.4;
+        this.secondHandGroup.add(sVis);
+        this.clockGroup.add(this.secondHandGroup);
+
+        // Center pin
+        const pinGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.4, 32);
+        pinGeo.rotateX(Math.PI / 2);
+        const pin = new THREE.Mesh(pinGeo, new THREE.MeshStandardMaterial({
+            color: COLORS.pin,
+            metalness: 0.8,
+            roughness: 0.2
+        }));
+        pin.position.z = 0.2;
+        this.clockGroup.add(pin);
+		
+		this.nightCircle = this.buildNightCircle();
+		this.dayCircle = this.buildDayCircle();
+ 		const n = day_dist;
+ 		const n_faceGeo = new THREE.CylinderGeometry(n, n, 0.1, 32);
+		this.n_faceMesh = new THREE.Mesh(n_faceGeo, this.nightCircle);
+		
+        n_faceGeo.rotateX(Math.PI / 2);// flip to see
+ 		this.n_faceMesh.position.z = -0.8;
+		this.n_faceMesh.receiveShadow = true;
+		this.clockGroup.add(this.n_faceMesh);
+  }
+	
+	cycleDayNight(requestedState) {
+	if (this.dayNight === requestedState) {
+		return; 
+	}
+	this.dayNight = requestedState;
+
+	if (requestedState === 'night') {
+		this.n_faceMesh.material = this.nightCircle;
+	} else {
+		this.n_faceMesh.material = this.dayCircle;
+	}
+}
+	
+	update() {
+        const now = new Date();
+        const utcHours = (now.getUTCHours() - main_offset- this.system_time_zone ) % 24;  // to get to common for all == 0  - this is the world time formula??
+        const utcMinutes = now.getUTCMinutes();
+        const utcSeconds = now.getUTCSeconds();
+        const utcMs = now.getUTCMilliseconds();
+		
+		const nHour = ((utcHours  + this.offsetHours) % 24 + 24) % 24;
+	    this.theLetterHour = alphabet[utcHours ];
+		showTheTime(this.theLetterHour + ':' + String(utcMinutes).padStart(2, '0'));
+
+        let currentPos = null;
+		this.letterMeshes.forEach(item => {
+			//const isCurrent = item.nPosition === nHour;  // this is what it was
+            const isCurrent = item.alpha_letter === this.theLetterHour;  // this is a cheat and could hide problems or be a problem
+            const targetScale = isCurrent ? 1.65 : item.baseScale;
+			
+            item.mesh.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.12);
+
+            if (isCurrent) {
+                currentPos = item.mesh.position.clone();
+			}
+        });
+
+        if (currentPos && this.highlight) {
+            this.highlight.visible = true;
+            this.highlight.position.copy(currentPos);
+            this.highlight.position.z = 0.12;
+
+            const pulse = 1 + Math.sin(now.getTime() * 0.004) * 0.01;
+            this.highlight.scale.setScalar(pulse);
+        }
+
+        let targetSlot = nHour;
+        const nwhich = targetSlot % 12;
+        const baseAngle = ((nwhich ) / 12) * Math.PI * 2;
+		// const fraction = (utcMinutes + (utcSeconds + utcMs / 1000) / 60) / 60;
+		// here's one of my cheats - only move the hour hand minutely so it always points mostly toward the Now hour
+		const fraction = (utcMinutes / 100);  // 60 is normal
+		
+        this.hourHandGroup.rotation.z = -(baseAngle + fraction * (Math.PI * 2 / 12));
+
+        // Minute & second (local)
+        const minutes = now.getMinutes();
+        const seconds = now.getSeconds();
+        const ms = now.getMilliseconds();
+        this.secondHandGroup.rotation.z = -((seconds + ms / 1000) / 60) * Math.PI * 2;
+        this.minuteHandGroup.rotation.z = -((minutes + seconds / 60) / 60) * Math.PI * 2;
+		this.cycleDayNight( seconds > 30 ? 'day' : 'night'); // just to see if it only triggers on change
+        this.renderer.render(this.scene, this.camera);
+    } 
+	
+}
+
+function showTheTime(letter) {
+  const divElement = document.getElementById('ShowTime');
+  divElement.textContent = letter;
+ 
+ }
+
+const bank = document.getElementById('clocks-bank');
+const clocks = demoZones.map(z => new ETimeClock(bank, z.offset, z.label));
+
+
+function animate() {
+
+    requestAnimationFrame(animate);
+//	clocks.forEach(c => c.gradientMaterial.uniforms.repetition.value = 3.0 + Math.sin(new Date() * 0.002) * 1.5);
+    clocks.forEach(c => c.update());
+}
+animate();
+</script>
+</body>
+</html>
+
+
+
