@@ -12,7 +12,7 @@ body {
     color: #f3f4f6;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     min-height: 100vh;
-    padding: 20px;
+    padding: 12px 16px;
 }
 
 h1 {
@@ -26,19 +26,39 @@ h1 {
 
 .subtitle {
     text-align: center;
-    color: #9ca3af;
-    font-size: 2.95rem;
-    margin-bottom: 28px;
+    font-size: 3.2rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin-bottom: 14px;
     max-width: 720px;
     margin-left: auto;
     margin-right: auto;
-    line-height: 1.5;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+    color: #e5e7eb;
+    background: none;
+}
+
+.subtitle.is-day {
+    color: #3B82F6; /* daytime blue */
+    text-shadow:
+        0 0 2px rgba(250, 204, 21, 0.95),
+        0 0 8px rgba(250, 204, 21, 0.85),
+        0 1px 0 rgba(253, 224, 71, 0.9);
+}
+
+.subtitle.is-night {
+    color: #0a0a0a; /* black */
+    text-shadow:
+        0 0 2px rgba(255, 255, 255, 0.95),
+        0 0 6px rgba(255, 255, 255, 0.75),
+        0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 #clocks-bank {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 28px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
     max-width: 1400px;
     margin: 0 auto;
 }
@@ -46,59 +66,26 @@ h1 {
 .clock-wrapper {
     background: rgba(30, 41, 59, 0.45);
     border: 2px solid rgba(255, 255, 255, 0.08);
-    border-radius: 20px;
-    padding: 6px 2px 2px;
+    border-radius: 14px;
+    padding: 4px 2px 0;
     display: flex;
     flex-direction: column;
     align-items: center;
 }
 
 .clock-label {
-    font-size: 0.95rem;
+    font-size: 1.45rem; /* half again as big as ~0.95rem */
     font-weight: 600;
     color: #38bdf8;
     margin-bottom: 0;
     text-align: center;
-}
-
-.clock-etime {
-    font-size: 3.2rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    line-height: 1.0;
-    margin-bottom: 2px;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-    color: #e5e7eb;
-    padding: 0;
-    border-radius: 0;
-    background: none;
-}
-
-.clock-etime.is-day {
-    color: #3B82F6; /* daytime blue */
-    background: none;
-    /* Yellow highlight halo */
-    text-shadow:
-        0 0 2px rgba(250, 204, 21, 0.95),
-        0 0 8px rgba(250, 204, 21, 0.85),
-        0 1px 0 rgba(253, 224, 71, 0.9);
-}
-
-.clock-etime.is-night {
-    color: #0a0a0a; /* black */
-    background: none;
-    /* Light halo so black stays readable on purple without a pill */
-    text-shadow:
-        0 0 2px rgba(255, 255, 255, 0.95),
-        0 0 6px rgba(255, 255, 255, 0.75),
-        0 1px 0 rgba(255, 255, 255, 0.9);
+    line-height: 1.15;
 }
 
 .clock-canvas {
     width: 100%;
     aspect-ratio: 1/1;
-    max-width: 340px;
+    max-width: 260px; /* shorter card — less blank around the dial */
     border-radius: 2px;
     overflow: hidden;
 }
@@ -215,12 +202,6 @@ class ETimeClock {
         this.label.className = 'clock-label';
         this.label.textContent = labelText;
         this.wrapper.appendChild(this.label);
-
-        // Same global eTime under every city — proves One World, One Time.
-        this.timeLine = document.createElement('div');
-        this.timeLine.className = 'clock-etime';
-        this.timeLine.textContent = '--:--';
-        this.wrapper.appendChild(this.timeLine);
 
         this.container = document.createElement('div');
         this.container.className = 'clock-canvas';
@@ -759,9 +740,13 @@ class ETimeClock {
 	} else {
 		this.n_faceMesh.material = this.dayCircle;
 	}
-	if (this.timeLine) {
-		this.timeLine.classList.toggle('is-day', requestedState === 'day');
-		this.timeLine.classList.toggle('is-night', requestedState === 'night');
+	// Header time style follows the viewer's home clock (Denver / LETTER_REF), not every city.
+	if (Math.round(this.offsetHours) === Math.round(LETTER_REF)) {
+		const el = document.getElementById('ShowTime');
+		if (el) {
+			el.classList.toggle('is-day', requestedState === 'day');
+			el.classList.toggle('is-night', requestedState === 'night');
+		}
 	}
 }
 	
@@ -866,7 +851,6 @@ class ETimeClock {
 
 			const et = this.theLetterHour + ':' + String(utcMinutes).padStart(2, '0');
 			showTheTime(et);
-			if (this.timeLine) this.timeLine.textContent = et;
 
 			// here's one of my cheats - only move the hour hand minutely so it always points mostly toward the Now hour
 			const fraction = (utcMinutes / 100);  // 60 is normal
