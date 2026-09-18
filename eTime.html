@@ -137,8 +137,8 @@ const COLORS = {
 	hourHandRight: '#807224',
 
 	// Letter bands (runtime tint on the dots)
-	letterUpcoming:      '#E4C65A', // gold — next 12 hours
-	letterPast:          '#6E5B8A', // dusk purple — last 12 hours
+	letterUpcoming:      '#F0D264', // gold — next 12 hours (tints two-tone glyph)
+	letterPast:          '#8B79B0', // dusk purple — last 12 hours
 
   // Highlight ring
     highlight:           0xffe6a0,
@@ -287,16 +287,29 @@ class ETimeClock {
         const tz = ((npos - this.offsetHours + LETTER_REF) % 24 + 24) % 24;
         const letter = alphabet[tz];
 
-		if (nDay === 1) {
-            ctx.fillStyle = COLORS.letterDay;
-        } else {
-            ctx.fillStyle = COLORS.letterNight;
-        }
-
+		// Two-tone glyph (light | dark). Band color is applied later via material.color
+		// so gold / purple / white all keep a left-right split like the hour hand.
         ctx.font = `bold ${size * 0.68}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(letter, size/2, size/2 + size*0.03);
+		const tx = size / 2;
+		const ty = size / 2 + size * 0.03;
+
+		ctx.save();
+		ctx.beginPath();
+		ctx.rect(0, 0, size / 2, size);
+		ctx.clip();
+		ctx.fillStyle = '#FFFFFF';
+		ctx.fillText(letter, tx, ty);
+		ctx.restore();
+
+		ctx.save();
+		ctx.beginPath();
+		ctx.rect(size / 2, 0, size / 2, size);
+		ctx.clip();
+		ctx.fillStyle = '#6E6E6E';
+		ctx.fillText(letter, tx, ty);
+		ctx.restore();
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.rotation = Math.PI / 2;
