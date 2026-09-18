@@ -57,8 +57,27 @@ h1 {
     font-size: 0.95rem;
     font-weight: 600;
     color: #38bdf8;
+    margin-bottom: 2px;
+    text-align: center;
+}
+
+.clock-etime {
+    font-size: 2.6rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    line-height: 1.05;
     margin-bottom: 10px;
     text-align: center;
+    font-variant-numeric: tabular-nums;
+    color: #e5e7eb;
+}
+
+.clock-etime.is-day {
+    color: #7EC8F8; /* sky blue — matches day face */
+}
+
+.clock-etime.is-night {
+    color: #DBD824; /* same family as day-side letters */
 }
 
 .clock-canvas {
@@ -100,7 +119,7 @@ const COLORS = {
     letterCurrent:       '#FFFFFF',
     letterDay:           '#DBD824',
     letterNight:         '#635F63',
-    backDay:           '#232AAD',
+    backDay:           '#5AC8FA',
     backNight:         '#212633',
     letterCurrentBg:     'rgba(255, 230, 150, 0.15)',
 
@@ -176,6 +195,12 @@ class ETimeClock {
         this.label.className = 'clock-label';
         this.label.textContent = labelText;
         this.wrapper.appendChild(this.label);
+
+        // Same global eTime under every city — proves One World, One Time.
+        this.timeLine = document.createElement('div');
+        this.timeLine.className = 'clock-etime';
+        this.timeLine.textContent = '--:--';
+        this.wrapper.appendChild(this.timeLine);
 
         this.container = document.createElement('div');
         this.container.className = 'clock-canvas';
@@ -420,8 +445,8 @@ class ETimeClock {
 		const ctx = canvas.getContext('2d');
 
 		const gradient = ctx.createLinearGradient(0, 0, 0,  sz);
-		gradient.addColorStop(0.0 , 'blue');
-		gradient.addColorStop(0.88 , 'blue');
+		gradient.addColorStop(0.0 , '#5AC8FA');
+		gradient.addColorStop(0.88 , '#5AC8FA');
 		gradient.addColorStop(0.92, 'yellow');
 
 		ctx.fillStyle = gradient;
@@ -463,16 +488,16 @@ class ETimeClock {
 		const ctx = canvas.getContext('2d');
 
 		const gradient = ctx.createLinearGradient(0, 0, 0, h);
-		gradient.addColorStop(0.0 , 'blue');  // need to anchor that blue on both ends - otherwise overlap or underlap
-		gradient.addColorStop(0.1 , 'blue');
-		gradient.addColorStop(0.48, 'blue');
+		gradient.addColorStop(0.0 , '#5AC8FA');  // sky blue anchors on both ends
+		gradient.addColorStop(0.1 , '#5AC8FA');
+		gradient.addColorStop(0.48, '#5AC8FA');
 		gradient.addColorStop(0.515, 'yellow');
 		gradient.addColorStop(0.52, 'green');
 		gradient.addColorStop(0.53, 'black');
 		gradient.addColorStop(0.91, 'black');
 		gradient.addColorStop(0.93, 'violet');
-		gradient.addColorStop(0.95, 'blue');
-		gradient.addColorStop(0.96, 'blue');
+		gradient.addColorStop(0.95, '#5AC8FA');
+		gradient.addColorStop(0.96, '#5AC8FA');
 
 
 		ctx.fillStyle = gradient;
@@ -690,6 +715,10 @@ class ETimeClock {
 	} else {
 		this.n_faceMesh.material = this.dayCircle;
 	}
+	if (this.timeLine) {
+		this.timeLine.classList.toggle('is-day', requestedState === 'day');
+		this.timeLine.classList.toggle('is-night', requestedState === 'night');
+	}
 }
 	
 	onSecondUpdate(sec) { console.log("secondhandupdate"); }
@@ -789,7 +818,9 @@ class ETimeClock {
 				this.onHourUpdate(now);
 			}
 
-			showTheTime(this.theLetterHour + ':' + String(utcMinutes).padStart(2, '0'));
+			const et = this.theLetterHour + ':' + String(utcMinutes).padStart(2, '0');
+			showTheTime(et);
+			if (this.timeLine) this.timeLine.textContent = et;
 
 			// here's one of my cheats - only move the hour hand minutely so it always points mostly toward the Now hour
 			const fraction = (utcMinutes / 100);  // 60 is normal
