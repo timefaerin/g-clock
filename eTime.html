@@ -493,14 +493,15 @@ class ETimeClock {
 		const ctx = canvas.getContext('2d');
 
 		const gradient = ctx.createLinearGradient(0, 0, 0, h);
-		gradient.addColorStop(0.0 , '#6FBFB7');  // sky blue anchors on both ends
+		// Keep day blue solid longer, then a short dusk so blue doesn't wash into night.
+		gradient.addColorStop(0.0 , '#6FBFB7');
 		gradient.addColorStop(0.1 , '#6FBFB7');
-		gradient.addColorStop(0.48, '#6FBFB7');
-		gradient.addColorStop(0.515, 'yellow');
-		gradient.addColorStop(0.52, 'green');
-		gradient.addColorStop(0.53, 'black');
-		gradient.addColorStop(0.91, 'black');
-		gradient.addColorStop(0.93, 'violet');
+		gradient.addColorStop(0.50, '#6FBFB7');
+		gradient.addColorStop(0.505, 'yellow');
+		gradient.addColorStop(0.51, 'green');
+		gradient.addColorStop(0.515, 'black');
+		gradient.addColorStop(0.92, 'black');
+		gradient.addColorStop(0.935, 'violet');
 		gradient.addColorStop(0.95, '#6FBFB7');
 		gradient.addColorStop(0.96, '#6FBFB7');
 
@@ -512,7 +513,7 @@ class ETimeClock {
 		ctx.fillStyle = '#ffffff'; // White stars
 	    for (let i = 0; i < starCount; i++) {
 			const x = Math.random() * w ;
-			const y = ( h/2 +Math.random() * (h /2 -120)); // the last to get out of sunset
+			const y = ( h * 0.52 + Math.random() * (h * 0.48 - 120)); // stay in night, clear of dusk
 			const radius =1.35 + Math.random() * 0.5; 
 
 			ctx.beginPath();
