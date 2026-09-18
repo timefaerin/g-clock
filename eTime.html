@@ -47,7 +47,7 @@ h1 {
     background: rgba(30, 41, 59, 0.45);
     border: 2px solid rgba(255, 255, 255, 0.08);
     border-radius: 20px;
-    padding: 2px;
+    padding: 6px 2px 2px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -57,32 +57,31 @@ h1 {
     font-size: 0.95rem;
     font-weight: 600;
     color: #38bdf8;
-    margin-bottom: 2px;
+    margin-bottom: 0;
     text-align: center;
 }
 
 .clock-etime {
-    font-size: 2.6rem;
+    font-size: 3.2rem;
     font-weight: 700;
     letter-spacing: 0.08em;
-    line-height: 1.05;
-    margin-bottom: 10px;
+    line-height: 1.0;
+    margin-bottom: 2px;
     text-align: center;
     font-variant-numeric: tabular-nums;
     color: #e5e7eb;
-    padding: 0.12em 0.45em;
-    border-radius: 0.35em;
+    padding: 0;
+    border-radius: 0;
+    background: none;
 }
 
 .clock-etime.is-day {
-    color: #7ECCC4; /* swallow-egg blue */
+    color: #7ECCC4; /* swallow-egg blue — time line only */
 }
 
 .clock-etime.is-night {
-    color: #0a0a0a; /* black */
-    background: rgba(255, 255, 255, 0.88);
-    padding: 0.12em 0.45em;
-    border-radius: 0.35em;
+    color: #0a0a0a; /* black, no pill */
+    background: none;
 }
 
 .clock-canvas {
@@ -124,7 +123,7 @@ const COLORS = {
     letterCurrent:       '#FFFFFF',
     letterDay:           '#DBD824',
     letterNight:         '#635F63',
-    backDay:           '#6FBFB7',
+    backDay:           '#232AAD',
     backNight:         '#212633',
     letterCurrentBg:     'rgba(255, 230, 150, 0.15)',
 
@@ -470,8 +469,8 @@ class ETimeClock {
 		const ctx = canvas.getContext('2d');
 
 		const gradient = ctx.createLinearGradient(0, 0, 0,  sz);
-		gradient.addColorStop(0.0 , '#6FBFB7');
-		gradient.addColorStop(0.88 , '#6FBFB7');
+		gradient.addColorStop(0.0 , '#232AAD');
+		gradient.addColorStop(0.88 , '#232AAD');
 		gradient.addColorStop(0.92, 'yellow');
 
 		ctx.fillStyle = gradient;
@@ -514,16 +513,16 @@ class ETimeClock {
 
 		const gradient = ctx.createLinearGradient(0, 0, 0, h);
 		// Keep day blue solid longer, then a short dusk so blue doesn't wash into night.
-		gradient.addColorStop(0.0 , '#6FBFB7');
-		gradient.addColorStop(0.1 , '#6FBFB7');
-		gradient.addColorStop(0.50, '#6FBFB7');
+		gradient.addColorStop(0.0 , '#232AAD');
+		gradient.addColorStop(0.1 , '#232AAD');
+		gradient.addColorStop(0.50, '#232AAD');
 		gradient.addColorStop(0.505, 'yellow');
 		gradient.addColorStop(0.51, 'green');
 		gradient.addColorStop(0.515, 'black');
 		gradient.addColorStop(0.92, 'black');
 		gradient.addColorStop(0.935, 'violet');
-		gradient.addColorStop(0.95, '#6FBFB7');
-		gradient.addColorStop(0.96, '#6FBFB7');
+		gradient.addColorStop(0.95, '#232AAD');
+		gradient.addColorStop(0.96, '#232AAD');
 
 
 		ctx.fillStyle = gradient;
