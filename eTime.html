@@ -135,6 +135,11 @@ const COLORS = {
 
 	hourHandLeft: '#F0E77E',
 	hourHandRight: '#807224',
+
+	// Letter bands (runtime tint on the dots)
+	letterUpcoming:      '#E4C65A', // gold — next 12 hours
+	letterPast:          '#6E5B8A', // dusk purple — last 12 hours
+
   // Highlight ring
     highlight:           0xffe6a0,
 
@@ -743,7 +748,7 @@ class ETimeClock {
 	}
 	
 	onHourUpdate(now)   {
-		let opa = 'white';  // current
+		let opa = '#FFFFFF';  // current hour
 		let nCurrent = -1;
 		const nwhich = ((this._nwhich % 12) + 12) % 12;
 
@@ -774,10 +779,12 @@ class ETimeClock {
  				targetScale = dot_size;
 				
 				this.letterMeshes[m].mesh.material.color.set(opa);
+				// Walking forward from "now": first half = upcoming, second half = last 12.
 				if (k > 11) {
-					opa = 'green';
+					opa = COLORS.letterPast;      // dusk purple
+				} else {
+					opa = COLORS.letterUpcoming; // gold
 				}
-				else {opa = 'yellow'};
 			}
         };
 
