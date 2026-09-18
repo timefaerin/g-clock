@@ -136,6 +136,9 @@ const COLORS = {
 //const alphabet =   "XWVUTSRQPONMLKJIHGFEDCBA";
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWX";
 const  main_offset = 6;  // to get the cross over correct
+// Fixed letter/dial reference used when the face was tuned (Denver UTC-6).
+// Kept constant on purpose — do NOT use the browser timezone here, or Japan/Denver drift apart.
+const LETTER_REF = -6;
 const dot_size = 1.3;
 const dot_size_current = 1.65;
  
@@ -243,8 +246,8 @@ class ETimeClock {
 		ctx.fillStyle = 'rgba(255, 0, 0, 0.15)';
 		ctx.clearRect(0, 0, size, size);
 
-        // Letter index is global (UTC-anchored); zone offset only rotates placement on the dial.
-        const tz = ((npos - this.offsetHours) % 24 + 24) % 24;
+        // Zone offset rotates placement; LETTER_REF keeps the tuned dial geometry (Denver-correct).
+        const tz = ((npos - this.offsetHours + LETTER_REF) % 24 + 24) % 24;
         const letter = alphabet[tz];
 
 		if (nDay === 1) {
@@ -749,16 +752,18 @@ class ETimeClock {
 		this.secondHandGroup.rotation.z = -(utcSeconds / 60) * Math.PI * 2;
 
 		const utcMinutes = now.getUTCMinutes();
-		if (utcMinutes !== this.lastMinute) {
+		const firstPaint = this.lastMinute === -1;
+		if (utcMinutes !== this.lastMinute || firstPaint) {
 			this.lastMinute = utcMinutes;
 			this.onMinuteUpdate(utcMinutes);
 
 			this.minuteHandGroup.rotation.z = -((utcMinutes + utcSeconds / 60) / 60) * Math.PI * 2;
 
-			// Global letter hour: same everywhere on Earth (UTC-anchored). Dial offset is local only.
-			// alphabet[0] === 'A' maps to UTC hour 0. main_offset is for dial geometry, not the letter name.
-			const utcHours = ((now.getUTCHours() % 24) + 24) % 24;
-			if (utcHours !== this.lastHour) {
+			// Global letter: same on every machine. Uses LETTER_REF (not browser TZ) so
+			// Denver and Japan agree. With LETTER_REF=-6 and main_offset=6 this matches
+			// the original Denver-tuned mapping (letter index === UTC hour).
+			const utcHours = ((now.getUTCHours() - main_offset - LETTER_REF) % 24 + 24) % 24;
+			if (utcHours !== this.lastHour || firstPaint) {
 				this.lastHour = utcHours;
 				this.theLetterHour = alphabet[utcHours];
 				this.onHourUpdate(now);
@@ -768,6 +773,8 @@ class ETimeClock {
 
 			let targetSlot = ((utcHours  + this.offsetHours) % 24 + 24) % 24;
 			const nwhich = targetSlot % 12;
+			// Letter dots are placed with +main_offset; leave that out here on purpose —
+			// with the Denver-tuned LETTER_REF it lines up via mod-12 geometry.
 			const baseAngle = ((nwhich ) / 12) * Math.PI * 2;
 			// here's one of my cheats - only move the hour hand minutely so it always points mostly toward the Now hour
 			const fraction = (utcMinutes / 100);  // 60 is normal
