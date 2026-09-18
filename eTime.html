@@ -218,7 +218,9 @@ class ETimeClock {
         this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
         this.camera.position.z = 14;
 
-        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        // Opaque canvas — page purple/blue was showing through torus gaps (looked like blue bleed).
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        this.renderer.setClearColor(0x1e293b, 1);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.shadowMap.enabled = true;
         this.container.appendChild(this.renderer.domElement);
@@ -596,6 +598,14 @@ class ETimeClock {
 		tube.rotation.z = Math.PI * 5.67;
 		tube.position.z = -0.5;
 		
+		// Dark annulus behind the torus so the day-face blue can't peek through mesh gaps
+		// (night looked fine because the face was already black there).
+		const torusBack = new THREE.Mesh(
+			new THREE.RingGeometry(3.05, 5.25, 64),
+			new THREE.MeshBasicMaterial({ color: 0x0a0a0a, side: THREE.DoubleSide })
+		);
+		torusBack.position.z = -0.65;
+		this.clockGroup.add(torusBack);
 		this.clockGroup.add(tube);
 	}		
 		
