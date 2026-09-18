@@ -573,6 +573,8 @@ class ETimeClock {
 
         const day_dist = 4.45;
         const night_dist = 3.45;
+        this.dayDist = day_dist;
+        this.nightDist = night_dist;
         const dot_size = 0.51;
 
         this.buildTube();
@@ -696,43 +698,51 @@ class ETimeClock {
 	}
 	
 	onHourUpdate(now)   {
-		let currentPos = null;
 		let opa = 'white';  // current
 		let nCurrent = -1;
-		
-		// find the current
+		const nwhich = ((this._nwhich % 12) + 12) % 12;
+
+		// Prefer the letter glyph that sits on the SAME clock angle as the hour hand.
+		// Letter dots are placed with +main_offset; the hand is not — they meet mod 12.
+		// If more than one mesh has the glyph, pick the one on the hand's ray (not 180° opposite).
+		let fallback = -1;
 		for (let f = 0; f < this.letterMeshes.length; f++) {
-            if (this.letterMeshes[f].alpha_letter === this.theLetterHour) {
-				nCurrent = f; 
+			if (this.letterMeshes[f].alpha_letter !== this.theLetterHour) continue;
+			fallback = f;
+			const angIdx = ((f + main_offset) % 12 + 12) % 12;
+			if (angIdx === nwhich) {
+				nCurrent = f;
+				break;
 			}
-		}	
-		
+		}
+		if (nCurrent < 0) nCurrent = fallback;
 
 	if (nCurrent >=0) {
             // Outer ring (indices 12–23) = day face; inner ring (0–11) = night face.
-            // Flip only when the current letter crosses between rings.
             this.cycleDayNight(nCurrent >= 12 ? 'day' : 'night');
-            currentPos = this.letterMeshes[nCurrent].mesh.position.clone();  // for pulse
-			let targetScale = dot_size_current;  // starting on current : item.baseScale;
+			let targetScale = dot_size_current;
 			let k = 0;
 			for (let n = nCurrent; n < 24 + nCurrent;n++) {		
 				let m = n % 24;
 				k++;  
 				this.letterMeshes[m].mesh.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.12);
- 				targetScale = dot_size;  // all the rest (not the best method)
+ 				targetScale = dot_size;
 				
-				this.letterMeshes[m].mesh.material.color.set(opa)// = opa;
+				this.letterMeshes[m].mesh.material.color.set(opa);
 				if (k > 11) {
-					opa = 'green';  // inactive - too many hours in the future to worry about
+					opa = 'green';
 				}
-				else {opa = 'yellow'};  // active but not current
+				else {opa = 'yellow'};
 			}
         };
 
-        if (currentPos && this.highlight) {
+        if (nCurrent >= 0 && this.highlight) {
+            // Sit on the hand's angle (not the raw mesh slot alone) so the circle
+            // can't land 180° opposite the hour hand when cowboy offsets interact.
+            const dist = this.letterMeshes[nCurrent].dist;
+            const ang = this._baseAngle;
             this.highlight.visible = true;
-            this.highlight.position.copy(currentPos);
-            this.highlight.position.z = 0.12;
+            this.highlight.position.set(Math.sin(ang) * dist, Math.cos(ang) * dist, 0.12);
 
             const pulse = 1 + Math.sin(now.getTime() * 0.004) * 0.01;
             this.highlight.scale.setScalar(pulse);
@@ -763,6 +773,16 @@ class ETimeClock {
 			// Denver and Japan agree. With LETTER_REF=-6 and main_offset=6 this matches
 			// the original Denver-tuned mapping (letter index === UTC hour).
 			const utcHours = ((now.getUTCHours() - main_offset - LETTER_REF) % 24 + 24) % 24;
+
+			let targetSlot = ((utcHours  + this.offsetHours) % 24 + 24) % 24;
+			const nwhich = ((targetSlot % 12) + 12) % 12;
+			// Letter dots are placed with +main_offset; leave that out here on purpose —
+			// with the Denver-tuned LETTER_REF it lines up via mod-12 geometry.
+			const baseAngle = ((nwhich ) / 12) * Math.PI * 2;
+			this._targetSlot = targetSlot;
+			this._nwhich = nwhich;
+			this._baseAngle = baseAngle;
+
 			if (utcHours !== this.lastHour || firstPaint) {
 				this.lastHour = utcHours;
 				this.theLetterHour = alphabet[utcHours];
@@ -771,11 +791,6 @@ class ETimeClock {
 
 			showTheTime(this.theLetterHour + ':' + String(utcMinutes).padStart(2, '0'));
 
-			let targetSlot = ((utcHours  + this.offsetHours) % 24 + 24) % 24;
-			const nwhich = targetSlot % 12;
-			// Letter dots are placed with +main_offset; leave that out here on purpose —
-			// with the Denver-tuned LETTER_REF it lines up via mod-12 geometry.
-			const baseAngle = ((nwhich ) / 12) * Math.PI * 2;
 			// here's one of my cheats - only move the hour hand minutely so it always points mostly toward the Now hour
 			const fraction = (utcMinutes / 100);  // 60 is normal
 			
