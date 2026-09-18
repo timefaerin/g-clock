@@ -16,3 +16,7 @@ Open any file in a browser to run it.
 ## Blender
 
 See [`etime/`](etime/) for `etimeNew27.blend` and its textures.
+
+## Latest demo
+
+Open [`eTime.html`](eTime.html) for the current multi-zone clock (includes Tokyo).
